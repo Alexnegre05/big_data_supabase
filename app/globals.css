@@ -88,7 +88,7 @@
     --neu-luz: oklch(1 0 0 / 0.95);
     --neu-sombra: oklch(0.55 0.03 100 / 0.3);
     /* Un color por ciudad (orden fijo de lib/etl/ciudades.ts), validado para daltonismo. */
-    --ciudad-1: #14998a;
+    --ciudad-1: #78b4e3;
     --ciudad-2: #c4773d;
     --ciudad-3: #3f6fb0;
     --ciudad-4: #7d8a2a;
@@ -136,7 +136,7 @@
     --chart-5: oklch(0.6 0.105 52.8);
     --neu-luz: oklch(0.32 0.022 109.8 / 0.6);
     --neu-sombra: oklch(0.08 0.01 109.8 / 0.7);
-    --ciudad-1: #16978a;
+    --ciudad-1: #a2d1f5;
     --ciudad-2: #c97a40;
     --ciudad-3: #5287d0;
     --ciudad-4: #87942f;
@@ -190,7 +190,7 @@ html[data-filtro="vintage"] {
     --radius: 0.375rem;
     --neu-luz: oklch(0.97 0.03 85 / 0.85);
     --neu-sombra: oklch(0.42 0.06 60 / 0.32);
-    --ciudad-1: #3d7a70;
+    --ciudad-1: #759fc5;
     --ciudad-2: #b07a2a;
     --ciudad-3: #4c6a92;
     --ciudad-4: #6f7f33;
@@ -243,7 +243,7 @@ html.dark[data-filtro="vintage"] {
     --chart-5: oklch(0.76 0.1 40);
     --neu-luz: oklch(0.54 0.04 70 / 0.6);
     --neu-sombra: oklch(0.22 0.03 60 / 0.55);
-    --ciudad-1: #7cc4b6;
+    --ciudad-1: #b1d5f2;
     --ciudad-2: #e8b866;
     --ciudad-3: #9db6e0;
     --ciudad-4: #b9c46a;

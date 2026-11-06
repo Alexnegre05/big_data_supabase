@@ -50,7 +50,7 @@ const DESCRIPCIONES: Record<TipoGrafico, (agregado: string) => string> = {
   lineas: (a) =>
     `Evolución diaria (${a === "suma" ? "suma" : "media"} de cada día). Pulsa la leyenda para ocultar ciudades.`,
   quesos: () => "Reparto de las horas válidas por rangos de valor.",
-  ciudades: () => "Proporción de horas válidas por ciudad; cada color identifica una ciudad.",
+  ciudades: () => "Desviación porcentual de cada ciudad frente a la media del conjunto. El tamaño de la porción representa su distancia absoluta.",
 }
 
 const fechaCorta = new Intl.DateTimeFormat("es-ES", {
@@ -774,23 +774,63 @@ function QuesosCiudades({
 }) {
   const [activa, setActiva] = React.useState<string | null>(null)
   const ciudades = React.useMemo(
-    () => resumirPorCiudad(validos, metrica).ciudades,
+    () => {
+      const campos = {
+        temperatura: "temperatura_c",
+        humedad: "humedad_pct",
+        precipitacion: "precipitacion_mm",
+      } as const
+      const grupos = new Map<string, { suma: number; n: number }>()
+      for (const fila of validos) {
+        const grupo = grupos.get(fila.ciudad) ?? { suma: 0, n: 0 }
+        grupo.suma += fila[campos[metrica]]
+        grupo.n++
+        grupos.set(fila.ciudad, grupo)
+      }
+      const medias = [...grupos].map(([ciudad, grupo]) => ({
+        ciudad,
+        registros: grupo.n,
+        valor: grupo.suma / grupo.n,
+      }))
+      const mediaGeneral = medias.length
+        ? medias.reduce((suma, ciudad) => suma + ciudad.valor, 0) / medias.length
+        : 0
+      return medias.map((ciudad) => ({
+        ...ciudad,
+        mediaGeneral,
+        desviacionPct:
+          mediaGeneral === 0
+            ? ciudad.valor === 0 ? 0 : null
+            : ((ciudad.valor - mediaGeneral) / Math.abs(mediaGeneral)) * 100,
+        magnitud:
+          mediaGeneral === 0
+            ? Math.abs(ciudad.valor - mediaGeneral)
+            : Math.abs((ciudad.valor - mediaGeneral) / Math.abs(mediaGeneral) * 100),
+      }))
+    },
     [validos, metrica]
   )
-  const total = ciudades.reduce((s, c) => s + c.registros, 0)
+  const totalDesviacion = ciudades.reduce((s, c) => s + c.magnitud, 0)
   const hueco = ciudades.length > 1 ? 2 : 0
   let acumulado = 0
   const porciones = ciudades.map((c) => {
-    const largo = total ? (c.registros / total) * CIRCUNFERENCIA : 0
+    const proporcion = totalDesviacion
+      ? c.magnitud / totalDesviacion
+      : 1 / Math.max(1, ciudades.length)
+    const largo = proporcion * CIRCUNFERENCIA
     const inicio = acumulado
     acumulado += largo
-    return { ...c, largo, inicio, medio: ((inicio + largo / 2) / CIRCUNFERENCIA) * 2 * Math.PI }
+    return { ...c, proporcion, largo, inicio, medio: ((inicio + largo / 2) / CIRCUNFERENCIA) * 2 * Math.PI }
   })
   const destacado = porciones.find((p) => p.ciudad === activa)
+  const formatoDesviacion = (valor: number | null) =>
+    valor === null
+      ? "No calculable"
+      : `${valor > 0 ? "+" : ""}${new Intl.NumberFormat("es-ES", { maximumFractionDigits: 1 }).format(valor)}%`
 
   return (
     <div className="flex flex-col items-center gap-6 @xl:flex-row @xl:items-center">
-      {/* La clave reinicia la animación al cambiar de métrica o de ciudad. */}
+      {/* Las porciones muestran cuánto se aleja cada media de la media entre ciudades. */}
       <div
         key={metrica}
         className="grafico-animado relative size-56 shrink-0"
@@ -836,9 +876,9 @@ function QuesosCiudades({
             )
           )}
         </svg>
-        {/* Porcentajes fuera del anillo, como en la referencia. */}
+        {/* El porcentaje con signo indica la desviación respecto a la media. */}
         {porciones.map((p) =>
-          p.registros / (total || 1) < 0.06 ? null : (
+          p.proporcion < 0.06 ? null : (
             <span
               key={p.ciudad}
               aria-hidden
@@ -849,16 +889,16 @@ function QuesosCiudades({
                 animation: `grafico-aparecer 0.4s ease-out ${1000 + porciones.indexOf(p) * 80}ms both`,
               }}
             >
-              {Math.round((p.registros / total) * 100)}%
+              {p.desviacionPct === null ? "—" : formatoDesviacion(p.desviacionPct)}
             </span>
           )
         )}
         <p className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center text-center">
           <span className="text-2xl font-semibold tracking-tight tabular-nums">
-            {formatoEntero(destacado ? destacado.registros : total)}
+            {formatoMedida(destacado ? destacado.valor : (ciudades[0]?.mediaGeneral ?? 0), METRICAS[metrica].unidad)}
           </span>
           <span className="max-w-24 text-xs text-muted-foreground">
-            {destacado ? destacado.ciudad : "horas válidas"}
+            {destacado ? formatoDesviacion(destacado.desviacionPct) : "media entre ciudades"}
           </span>
         </p>
       </div>
@@ -885,10 +925,10 @@ function QuesosCiudades({
                 />
                 <span className="flex-1">{p.ciudad}</span>
                 <span className="text-muted-foreground tabular-nums">
-                  {formatoEntero(p.registros)} h
+                  Media {formatoMedida(p.valor, METRICAS[metrica].unidad)}
                 </span>
                 <span className="w-24 text-right font-medium tabular-nums">
-                  {formatoMedida(p.valor, METRICAS[metrica].unidad)}
+                  {formatoDesviacion(p.desviacionPct)}
                 </span>
               </button>
             </li>

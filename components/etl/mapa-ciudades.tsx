@@ -28,6 +28,7 @@ import { METRICAS, resumirPorCiudad, type Metrica } from "@/lib/etl/resumen"
 import { FILTROS, type Filtro } from "@/lib/filtro-visual"
 import { cn } from "@/lib/utils"
 
+import { colorCiudad } from "./colores"
 import { useCapaViento, useVientoActual } from "./capa-viento"
 import { MarcoVintage, RosaVientos } from "./adornos-vintage"
 import { iconoVintage, useCriaturasVintage } from "./decoracion-vintage"
@@ -64,11 +65,21 @@ function estiloMapa(
   return { clave: url, estilo: url }
 }
 
-const TITULOS_CORTOS: Record<Metrica, string> = {
+type MetricaMapa = Metrica | "ciudad"
+
+const TITULOS_CORTOS: Record<MetricaMapa, string> = {
+  ciudad: "Ciudad",
   temperatura: "Temperatura",
   humedad: "Humedad",
   precipitacion: "Lluvia",
 }
+const OPCIONES_METRICA: { valor: MetricaMapa; titulo: string }[] = [
+  { valor: "ciudad", titulo: "Ciudad" },
+  ...(Object.keys(METRICAS) as Metrica[]).map((m) => ({
+    valor: m,
+    titulo: TITULOS_CORTOS[m],
+  })),
+]
 
 const COMUNIDAD_CIUDAD: Record<string, string> = {
   Barcelona: "Cataluña",
@@ -184,7 +195,7 @@ export function MapaCiudades({ etl }: { etl: PipelineEtl }) {
   const [filtro, setFiltro] = useFiltroVisual()
   const vintage = filtro === "vintage"
 
-  const [metrica, setMetrica] = React.useState<Metrica>("temperatura")
+  const [metrica, setMetrica] = React.useState<MetricaMapa>("ciudad")
   const [panelMetricaPlegado, setPanelMetricaPlegado] = React.useState(true)
   const [estilo, setEstilo] = React.useState<Estilo>("datos")
   // El viento es decorativo: apagado por defecto y sin recordarse al recargar.
@@ -399,7 +410,7 @@ export function MapaCiudades({ etl }: { etl: PipelineEtl }) {
 
   const valorDe = (ciudad: string) => {
     const d = datos?.get(ciudad)
-    return d ? d[metrica] : null
+    return d && metrica !== "ciudad" ? d[metrica] : null
   }
   const valores = NOMBRES_CIUDADES.map(valorDe).filter(
     (v): v is number => v !== null
@@ -415,7 +426,7 @@ export function MapaCiudades({ etl }: { etl: PipelineEtl }) {
       : RAMPA
   const colorDe = (v: number) =>
     interpolar(rampa, maximo > minimo ? (v - minimo) / (maximo - minimo) : 0.5)
-  const { unidad } = METRICAS[metrica]
+  const unidad = metrica === "ciudad" ? "" : METRICAS[metrica].unidad
 
   const incluida = (nombre: string) => config.ciudades.includes(nombre)
   const alternarCiudad = (nombre: string, marcar: boolean) =>
@@ -522,14 +533,13 @@ export function MapaCiudades({ etl }: { etl: PipelineEtl }) {
             {!panelMetricaPlegado && <>
             <Segmentado
               etiqueta="Métrica"
-              opciones={(Object.keys(METRICAS) as Metrica[]).map((m) => ({
-                valor: m,
-                titulo: TITULOS_CORTOS[m],
-              }))}
+              opciones={OPCIONES_METRICA}
               valor={metrica}
               alCambiar={setMetrica}
             />
-            {datos && valores.length > 0 ? (
+            {metrica === "ciudad" ? (
+              <LeyendaCiudades />
+            ) : datos && valores.length > 0 ? (
               <Leyenda
                 titulo={METRICAS[metrica].titulo}
                 unidad={unidad}
@@ -664,7 +674,7 @@ export function MapaCiudades({ etl }: { etl: PipelineEtl }) {
               ciudad={c.nombre}
               valor={valorDe(c.nombre)}
               unidad={unidad}
-              color={colorDe}
+              color={metrica === "ciudad" ? () => colorCiudad(c.nombre) : colorDe}
               incluida={incluida(c.nombre)}
               resaltada={activa === c.nombre || resaltada === c.nombre}
               alPulsar={() => enfocar(c)}
@@ -779,9 +789,7 @@ function Marcador({
           style={{
             background: !incluida
               ? "var(--color-card)"
-              : valor !== null
-                ? color(valor)
-                : "var(--color-primary)",
+              : color(valor ?? 0),
           }}
         />
         <span
@@ -950,6 +958,26 @@ function Leyenda({
         <span>{formatoMedida(minimo, unidad)}</span>
         <span>{formatoMedida(maximo, unidad)}</span>
       </span>
+    </div>
+  )
+}
+
+function LeyendaCiudades() {
+  return (
+    <div className="flex flex-col gap-1 text-xs">
+      <span className="text-muted-foreground">Color fijo por ciudad</span>
+      <ul className="flex flex-wrap gap-x-3 gap-y-1">
+        {CIUDADES.map((ciudad) => (
+          <li key={ciudad.nombre} className="flex items-center gap-1.5">
+            <span
+              aria-hidden
+              className="size-2.5 rounded-full"
+              style={{ background: colorCiudad(ciudad.nombre) }}
+            />
+            {ciudad.nombre}
+          </li>
+        ))}
+      </ul>
     </div>
   )
 }
