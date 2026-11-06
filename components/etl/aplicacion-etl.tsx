@@ -5,6 +5,7 @@ import * as React from "react"
 import { usePipelineEtl } from "@/hooks/use-pipeline-etl"
 
 import { BarraSuperior } from "./barra-superior"
+import { DialogoAgente } from "./dialogo-agente"
 import type { Pestana } from "./inspeccion-datos"
 import { MapaCiudades } from "./mapa-ciudades"
 import { PanelTrabajo, type AnchoPanel, type Vista } from "./panel-trabajo"
@@ -124,6 +125,7 @@ export function AplicacionEtl() {
           navegar={navegar}
         />
       </div>
+      <DialogoAgente etl={etl} />
     </div>
   )
 }
