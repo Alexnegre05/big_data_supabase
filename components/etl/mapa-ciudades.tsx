@@ -70,6 +70,36 @@ const TITULOS_CORTOS: Record<Metrica, string> = {
   precipitacion: "Lluvia",
 }
 
+const COMUNIDAD_CIUDAD: Record<string, string> = {
+  Barcelona: "Cataluña",
+  Madrid: "Comunidad de Madrid",
+  Sevilla: "Andalucía",
+  Bilbao: "País Vasco",
+  Valencia: "Comunitat Valenciana",
+}
+const INFORMACION_CIUDAD: Record<string, { resumen: string; fuente: string }> = {
+  Barcelona: {
+    resumen: "Ciudad mediterránea y puerta de entrada a Cataluña, conocida por su patrimonio cultural, su arquitectura modernista y su relación con el mar.",
+    fuente: "https://professional.barcelonaturisme.com/en/travel-trade/why-barcelona/gateway-to-catalonia",
+  },
+  Madrid: {
+    resumen: "Capital de España y destacado centro cultural. La ciudad combina museos, plazas históricas y grandes parques urbanos como El Retiro y la Casa de Campo.",
+    fuente: "https://www.esmadrid.com/en/welcome-madrid",
+  },
+  Sevilla: {
+    resumen: "Capital andaluza vinculada históricamente al Guadalquivir, un río navegable que ha marcado la vida, el comercio y el patrimonio de la ciudad.",
+    fuente: "https://visitasevilla.es/el-guadalquivir/",
+  },
+  Bilbao: {
+    resumen: "Ciudad del País Vasco junto a la ría del Nervión. Su transformación urbana convive con el Casco Viejo y referentes culturales como el Museo Guggenheim.",
+    fuente: "https://www.bilbaoturismo.net/BilbaoTurismo/en/by-bilbaos-estuary/bilbao",
+  },
+  Valencia: {
+    resumen: "Ciudad mediterránea que combina un centro histórico con arquitectura contemporánea. El antiguo cauce del Turia forma un corredor verde y la Albufera queda en su entorno natural.",
+    fuente: "https://www.visitvalencia.com/sites/default/files/media/downloadable-file/files/GuiaLocalizacionesVFO.PDF",
+  },
+}
+
 /**
  * Rampa secuencial de un solo tono (Persian orange #CF8852), claro → oscuro, para
  * la magnitud de la métrica. Validada como rampa ordinal en ambos modos: tono
@@ -790,6 +820,8 @@ function FichaCiudad({
   cerrar: () => void
 }) {
   const total = datos ? datos.validos + datos.rechazados : 0
+  const [informacionAbierta, setInformacionAbierta] = React.useState(false)
+  const idInformacion = React.useId()
   return (
     <aside
       aria-label={`Ficha de ${ciudad.nombre}`}
@@ -801,6 +833,9 @@ function FichaCiudad({
             <p className="font-medium">{ciudad.nombre}</p>
             <p className="text-xs text-muted-foreground tabular-nums">
               {ciudad.latitud.toFixed(4)}°, {ciudad.longitud.toFixed(4)}°
+            </p>
+            <p className="text-xs text-muted-foreground">
+              Comunidad autónoma: {COMUNIDAD_CIUDAD[ciudad.nombre]}
             </p>
           </div>
           <Button
@@ -841,6 +876,35 @@ function FichaCiudad({
             precipitación.
           </p>
         )}
+
+        <div className="flex flex-col gap-2 border-t pt-2">
+          <button
+            type="button"
+            aria-expanded={informacionAbierta}
+            aria-controls={idInformacion}
+            onClick={() => setInformacionAbierta((abierta) => !abierta)}
+            className="flex items-center gap-2 text-left text-xs font-medium text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+          >
+            Información de la ciudad
+            <ChevronDownIcon
+              aria-hidden
+              className={cn("ml-auto size-3.5 transition-transform", informacionAbierta && "rotate-180")}
+            />
+          </button>
+          {informacionAbierta && (
+            <div id={idInformacion} className="flex flex-col gap-2 text-xs">
+              <p>{INFORMACION_CIUDAD[ciudad.nombre].resumen}</p>
+              <a
+                href={INFORMACION_CIUDAD[ciudad.nombre].fuente}
+                target="_blank"
+                rel="noreferrer"
+                className="underline underline-offset-2"
+              >
+                Fuente turística oficial
+              </a>
+            </div>
+          )}
+        </div>
 
         <Button
           variant={incluida ? "outline" : "default"}

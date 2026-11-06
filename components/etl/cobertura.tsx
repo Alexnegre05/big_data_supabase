@@ -138,8 +138,8 @@ export function Cobertura({
       </dl>
 
       {/* Silueta en la esquina, como un mapa decorativo pero con las ciudades vivas. */}
-      <div className="absolute right-3 bottom-3 w-[66%] max-w-72">
-        <svg viewBox="-2 -2 112 86" className="w-full overflow-visible">
+      <div className="pointer-events-none absolute right-3 bottom-3 z-20 w-[66%] max-w-72">
+        <svg viewBox="-2 -2 112 86" className="pointer-events-none w-full overflow-visible">
           <g
             className="fill-foreground/12 stroke-foreground/25"
             strokeWidth={0.4}
@@ -157,6 +157,11 @@ export function Cobertura({
                 key={c.nombre}
                 onMouseEnter={() => setActiva(c.nombre)}
                 onMouseLeave={() => setActiva(null)}
+                onFocus={() => setActiva(c.nombre)}
+                onBlur={() => setActiva(null)}
+                style={{ pointerEvents: "auto" }}
+                tabIndex={incluida ? 0 : undefined}
+                aria-label={`${c.nombre}, ${incluida ? "seleccionada" : "no seleccionada"}`}
                 className="cursor-default"
               >
                 <title>
@@ -185,16 +190,26 @@ export function Cobertura({
                   strokeWidth={incluida ? 1 : 1.2}
                   className="transition-all"
                 />
-                <text
-                  x={x + 5}
-                  y={y + 1.6}
-                  className={cn(
-                    "fill-foreground text-[4.5px] transition-opacity",
-                    esActiva ? "opacity-100" : "opacity-0"
-                  )}
-                >
-                  {c.nombre}
-                </text>
+                {esActiva && incluida && (
+                  <g pointerEvents="none">
+                    <rect
+                      x={x + 5}
+                      y={y - 4.5}
+                      width={c.nombre.length * 2.8 + 3}
+                      height={7}
+                      rx={2}
+                      className="fill-popover stroke-border"
+                      strokeWidth={0.35}
+                    />
+                    <text
+                      x={x + 6.5}
+                      y={y + 0.5}
+                      className="fill-popover-foreground text-[4.5px] font-medium"
+                    >
+                      {c.nombre}
+                    </text>
+                  </g>
+                )}
               </g>
             )
           })}

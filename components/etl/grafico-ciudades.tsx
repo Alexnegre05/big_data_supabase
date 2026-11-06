@@ -7,6 +7,7 @@ import {
   ChartSplineIcon,
   CloudRainIcon,
   DropletsIcon,
+  MapPinIcon,
   ThermometerIcon,
 } from "lucide-react"
 
@@ -35,7 +36,7 @@ const ALTO = "h-56"
 const TEXTURA =
   "bg-[repeating-linear-gradient(135deg,var(--color-border)_0_4px,transparent_4px_8px)]"
 
-type TipoGrafico = "barras" | "lineas" | "quesos"
+type TipoGrafico = "barras" | "lineas" | "quesos" | "ciudades"
 
 const ICONOS_METRICA = {
   temperatura: ThermometerIcon,
@@ -49,6 +50,7 @@ const DESCRIPCIONES: Record<TipoGrafico, (agregado: string) => string> = {
   lineas: (a) =>
     `Evolución diaria (${a === "suma" ? "suma" : "media"} de cada día). Pulsa la leyenda para ocultar ciudades.`,
   quesos: () => "Reparto de las horas válidas por rangos de valor.",
+  ciudades: () => "Proporción de horas válidas por ciudad; cada color identifica una ciudad.",
 }
 
 const fechaCorta = new Intl.DateTimeFormat("es-ES", {
@@ -101,6 +103,7 @@ export function GraficoCiudades({ etl }: { etl: PipelineEtl }) {
               { valor: "barras", titulo: "Barras", icono: ChartColumnBigIcon },
               { valor: "lineas", titulo: "Líneas", icono: ChartSplineIcon },
               { valor: "quesos", titulo: "Quesos", icono: ChartPieIcon },
+              { valor: "ciudades", titulo: "Por ciudad", icono: MapPinIcon },
             ]}
             valor={tipo}
             alCambiar={setTipo}
@@ -120,6 +123,7 @@ export function GraficoCiudades({ etl }: { etl: PipelineEtl }) {
             <Lineas validos={validos} metrica={metrica} unidad={unidad} />
           )}
           {tipo === "quesos" && <Quesos validos={validos} metrica={metrica} />}
+          {tipo === "ciudades" && <QuesosCiudades validos={validos} metrica={metrica} />}
           <table className="sr-only">
             <caption>
               {titulo} por ciudad ({unidad})
@@ -665,6 +669,7 @@ function Lineas({
 const RADIO = 42
 const CIRCUNFERENCIA = 2 * Math.PI * RADIO
 
+/** Quesito original: distribución de registros por rangos de la métrica. */
 function Quesos({
   validos,
   metrica,
@@ -674,25 +679,14 @@ function Quesos({
 }) {
   const [ciudad, setCiudad] = React.useState("todas")
   const [activo, setActivo] = React.useState<number | null>(null)
-  const ciudades = NOMBRES_CIUDADES.filter((c) =>
-    validos.some((r) => r.ciudad === c)
-  )
+  const ciudades = NOMBRES_CIUDADES.filter((c) => validos.some((r) => r.ciudad === c))
   const rangos = React.useMemo(
-    () =>
-      distribucionPorRangos(
-        ciudad === "todas"
-          ? validos
-          : validos.filter((r) => r.ciudad === ciudad),
-        metrica
-      ),
+    () => distribucionPorRangos(ciudad === "todas" ? validos : validos.filter((r) => r.ciudad === ciudad), metrica),
     [validos, metrica, ciudad]
   )
   const total = rangos.reduce((s, r) => s + r.horas, 0)
-  // Hueco de 2 unidades entre porciones (como el espaciado entre barras).
   const hueco = rangos.filter((r) => r.horas > 0).length > 1 ? 2 : 0
-  const largos = rangos.map((r) =>
-    total ? (r.horas / total) * CIRCUNFERENCIA : 0
-  )
+  const largos = rangos.map((r) => total ? (r.horas / total) * CIRCUNFERENCIA : 0)
   const porciones = rangos.map((r, i) => {
     const largo = largos[i]
     const inicio = largos.slice(0, i).reduce((s, x) => s + x, 0)
@@ -703,9 +697,102 @@ function Quesos({
 
   return (
     <div className="flex flex-col items-center gap-6 @xl:flex-row @xl:items-center">
+      <div key={`${metrica}-${ciudad}`} className="grafico-animado relative size-56 shrink-0">
+        <svg viewBox="0 0 120 120" aria-hidden className="size-full -rotate-90" style={{ animation: "grafico-giro 0.9s cubic-bezier(0.3, 0.7, 0.4, 1) both" }}>
+          <circle cx="60" cy="60" r={RADIO} fill="none" strokeWidth={14} className="stroke-muted" />
+          {porciones.map((p) => p.largo <= hueco ? null : (
+            <circle
+              key={p.etiqueta}
+              cx="60" cy="60" r={RADIO} fill="none"
+              stroke={COLORES_RANGO[p.i]}
+              strokeWidth={activo === p.i ? 18 : 14}
+              strokeDasharray={`${p.largo - hueco} ${CIRCUNFERENCIA}`}
+              strokeDashoffset={-p.inicio}
+              strokeLinecap="butt"
+              className="cursor-pointer transition-all duration-200"
+              style={{ animation: `grafico-porcion ${Math.max(250, (p.largo / CIRCUNFERENCIA) * 900)}ms ease-out ${300 + (p.inicio / CIRCUNFERENCIA) * 900}ms both` }}
+              opacity={activo !== null && activo !== p.i ? 0.35 : 1}
+              onMouseEnter={() => setActivo(p.i)}
+              onMouseLeave={() => setActivo(null)}
+            />
+          ))}
+        </svg>
+        {porciones.map((p) => p.horas / (total || 1) < 0.06 ? null : (
+          <span
+            key={p.etiqueta} aria-hidden
+            className="pointer-events-none absolute -translate-x-1/2 -translate-y-1/2 text-xs font-semibold tabular-nums"
+            style={{ left: `${50 + 49 * Math.sin(p.medio)}%`, top: `${50 - 49 * Math.cos(p.medio)}%`, animation: `grafico-aparecer 0.4s ease-out ${1000 + p.i * 80}ms both` }}
+          >
+            {Math.round((p.horas / total) * 100)}%
+          </span>
+        ))}
+        <p className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center text-center">
+          <span className="text-2xl font-semibold tracking-tight tabular-nums">{formatoEntero(destacado ? destacado.horas : total)}</span>
+          <span className="max-w-24 text-xs text-muted-foreground">{destacado ? destacado.etiqueta : "horas válidas"}</span>
+        </p>
+      </div>
+      <div className="flex w-full flex-col gap-3">
+        <div className="flex items-center gap-2 self-start text-sm">
+          <span aria-hidden className="text-muted-foreground">Ciudad</span>
+          <Desplegable
+            etiqueta="Ciudad del gráfico de quesos"
+            opciones={[{ valor: "todas", titulo: "Todas las ciudades" }, ...ciudades.map((c) => ({ valor: c, titulo: c, color: colorCiudad(c) }))]}
+            valor={ciudad}
+            alCambiar={setCiudad}
+          />
+        </div>
+        <ul className="flex flex-col gap-1.5">
+          {porciones.map((p) => (
+            <li key={p.etiqueta}>
+              <button
+                type="button"
+                onMouseEnter={() => setActivo(p.i)}
+                onMouseLeave={() => setActivo(null)}
+                onFocus={() => setActivo(p.i)}
+                onBlur={() => setActivo(null)}
+                className={cn("flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm transition-all outline-none focus-visible:ring-3 focus-visible:ring-ring/50", activo === p.i ? "neu-hundido" : "hover:bg-muted/50")}
+              >
+                <span aria-hidden className="size-3 shrink-0 rounded-sm" style={{ background: COLORES_RANGO[p.i] }} />
+                <span className="flex-1">{p.etiqueta}</span>
+                <span className="text-muted-foreground tabular-nums">{formatoEntero(p.horas)} h</span>
+                <span className="w-14 text-right font-medium tabular-nums">{formatoPorcentaje(p.horas, total)}</span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      </div>
+    </div>
+  )
+}
+
+function QuesosCiudades({
+  validos,
+  metrica,
+}: {
+  validos: readonly RegistroValido[]
+  metrica: Metrica
+}) {
+  const [activa, setActiva] = React.useState<string | null>(null)
+  const ciudades = React.useMemo(
+    () => resumirPorCiudad(validos, metrica).ciudades,
+    [validos, metrica]
+  )
+  const total = ciudades.reduce((s, c) => s + c.registros, 0)
+  const hueco = ciudades.length > 1 ? 2 : 0
+  let acumulado = 0
+  const porciones = ciudades.map((c) => {
+    const largo = total ? (c.registros / total) * CIRCUNFERENCIA : 0
+    const inicio = acumulado
+    acumulado += largo
+    return { ...c, largo, inicio, medio: ((inicio + largo / 2) / CIRCUNFERENCIA) * 2 * Math.PI }
+  })
+  const destacado = porciones.find((p) => p.ciudad === activa)
+
+  return (
+    <div className="flex flex-col items-center gap-6 @xl:flex-row @xl:items-center">
       {/* La clave reinicia la animación al cambiar de métrica o de ciudad. */}
       <div
-        key={`${metrica}-${ciudad}`}
+        key={metrica}
         className="grafico-animado relative size-56 shrink-0"
       >
         <svg
@@ -727,13 +814,13 @@ function Quesos({
           {porciones.map((p) =>
             p.largo <= hueco ? null : (
               <circle
-                key={p.etiqueta}
+                key={p.ciudad}
                 cx="60"
                 cy="60"
                 r={RADIO}
                 fill="none"
-                stroke={COLORES_RANGO[p.i]}
-                strokeWidth={activo === p.i ? 18 : 14}
+                stroke={colorCiudad(p.ciudad)}
+                strokeWidth={activa === p.ciudad ? 18 : 14}
                 strokeDasharray={`${p.largo - hueco} ${CIRCUNFERENCIA}`}
                 strokeDashoffset={-p.inicio}
                 strokeLinecap="butt"
@@ -742,84 +829,66 @@ function Quesos({
                   // Cada porción se dibuja cuando termina la anterior: un barrido en círculo.
                   animation: `grafico-porcion ${Math.max(250, (p.largo / CIRCUNFERENCIA) * 900)}ms ease-out ${300 + (p.inicio / CIRCUNFERENCIA) * 900}ms both`,
                 }}
-                opacity={activo !== null && activo !== p.i ? 0.35 : 1}
-                onMouseEnter={() => setActivo(p.i)}
-                onMouseLeave={() => setActivo(null)}
+                opacity={activa !== null && activa !== p.ciudad ? 0.35 : 1}
+                onMouseEnter={() => setActiva(p.ciudad)}
+                onMouseLeave={() => setActiva(null)}
               />
             )
           )}
         </svg>
         {/* Porcentajes fuera del anillo, como en la referencia. */}
         {porciones.map((p) =>
-          p.horas / (total || 1) < 0.06 ? null : (
+          p.registros / (total || 1) < 0.06 ? null : (
             <span
-              key={p.etiqueta}
+              key={p.ciudad}
               aria-hidden
               className="pointer-events-none absolute -translate-x-1/2 -translate-y-1/2 text-xs font-semibold tabular-nums"
               style={{
                 left: `${50 + 49 * Math.sin(p.medio)}%`,
                 top: `${50 - 49 * Math.cos(p.medio)}%`,
-                animation: `grafico-aparecer 0.4s ease-out ${1000 + p.i * 80}ms both`,
+                animation: `grafico-aparecer 0.4s ease-out ${1000 + porciones.indexOf(p) * 80}ms both`,
               }}
             >
-              {Math.round((p.horas / total) * 100)}%
+              {Math.round((p.registros / total) * 100)}%
             </span>
           )
         )}
         <p className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center text-center">
           <span className="text-2xl font-semibold tracking-tight tabular-nums">
-            {formatoEntero(destacado ? destacado.horas : total)}
+            {formatoEntero(destacado ? destacado.registros : total)}
           </span>
           <span className="max-w-24 text-xs text-muted-foreground">
-            {destacado ? destacado.etiqueta : "horas válidas"}
+            {destacado ? destacado.ciudad : "horas válidas"}
           </span>
         </p>
       </div>
 
       <div className="flex w-full flex-col gap-3">
-        <div className="flex items-center gap-2 self-start text-sm">
-          <span aria-hidden className="text-muted-foreground">
-            Ciudad
-          </span>
-          <Desplegable
-            etiqueta="Ciudad del gráfico de quesos"
-            opciones={[
-              { valor: "todas", titulo: "Todas las ciudades" },
-              ...ciudades.map((c) => ({
-                valor: c,
-                titulo: c,
-                color: colorCiudad(c),
-              })),
-            ]}
-            valor={ciudad}
-            alCambiar={setCiudad}
-          />
-        </div>
         <ul className="flex flex-col gap-1.5">
           {porciones.map((p) => (
-            <li key={p.etiqueta}>
+            <li key={p.ciudad}>
               <button
                 type="button"
-                onMouseEnter={() => setActivo(p.i)}
-                onMouseLeave={() => setActivo(null)}
-                onFocus={() => setActivo(p.i)}
-                onBlur={() => setActivo(null)}
+                onMouseEnter={() => setActiva(p.ciudad)}
+                onMouseLeave={() => setActiva(null)}
+                onFocus={() => setActiva(p.ciudad)}
+                onBlur={() => setActiva(null)}
                 className={cn(
                   "flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm transition-all outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
-                  activo === p.i ? "neu-hundido" : "hover:bg-muted/50"
+                  activa === p.ciudad ? "neu-hundido" : "hover:bg-muted/50"
                 )}
               >
                 <span
                   aria-hidden
                   className="size-3 shrink-0 rounded-sm"
-                  style={{ background: COLORES_RANGO[p.i] }}
+                  style={{ background: colorCiudad(p.ciudad) }}
                 />
-                <span className="flex-1">{p.etiqueta}</span>
+                <span className="flex-1">{p.ciudad}</span>
                 <span className="text-muted-foreground tabular-nums">
-                  {formatoEntero(p.horas)} h
+                  {formatoEntero(p.registros)} h
                 </span>
-                <span className="w-14 text-right font-medium tabular-nums">
-                  {formatoPorcentaje(p.horas, total)}
+                <span className="w-24 text-right font-medium tabular-nums">
+                  {formatoMedida(p.valor, METRICAS[metrica].unidad)}
                 </span>
               </button>
             </li>
