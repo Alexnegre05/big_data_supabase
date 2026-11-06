@@ -143,7 +143,7 @@ export function PanelTrabajo({
         <div
           role="tablist"
           aria-label="Vistas del panel"
-          className="flex min-w-0 flex-1 gap-1 overflow-x-auto"
+          className="flex min-w-0 flex-1 flex-wrap gap-1"
         >
           {VISTAS.map(({ id, titulo, icono: Icono, ayuda }) => (
             <button
@@ -156,14 +156,14 @@ export function PanelTrabajo({
               aria-controls={`contenido-${id}`}
               onClick={() => setVista(id)}
               className={cn(
-                "flex shrink-0 items-center gap-1.5 rounded-lg px-2 py-1.5 text-sm whitespace-nowrap transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
+                "flex min-w-0 flex-1 items-center justify-center gap-1.5 rounded-lg px-1 py-1.5 text-sm whitespace-nowrap transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50 @sm:px-2",
                 vista === id
                   ? "bg-muted font-medium text-foreground ring-1 ring-foreground/10"
                   : "text-muted-foreground hover:bg-muted/60 hover:text-foreground"
               )}
             >
               <Icono aria-hidden className="size-4 text-marca" />
-              {titulo}
+              <span className="hidden @sm:inline">{titulo}</span>
               {id === "datos" && validos !== undefined && (
                 <span className="rounded-full bg-marca/15 px-1.5 text-xs tabular-nums">
                   <span className="sr-only">(</span>

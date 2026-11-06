@@ -52,7 +52,7 @@ function RielPipeline({
   const fases = calcularFases(etl)
   return (
     <nav aria-label="Fases del pipeline" className="min-w-0 flex-1">
-      <ol className="flex items-center gap-1 overflow-x-auto py-1.5">
+      <ol className="flex flex-wrap items-center gap-1 py-1.5">
         {fases.map((f, i) => {
           const Icono = ICONOS_FASE[f.id]
           const estado = ESTADOS[f.estado]
@@ -129,11 +129,13 @@ export function BarraSuperior({
   alternarPanel: () => void
 }) {
   return (
-    <header className="z-30 flex h-16 shrink-0 items-center gap-2 border-b bg-card px-2 shadow-sm sm:gap-4 sm:px-4">
+    <header className="z-30 flex min-h-16 shrink-0 flex-wrap items-center gap-x-2 gap-y-1 border-b bg-card px-2 py-1 shadow-sm sm:gap-4 sm:px-4">
       <h1 className="sr-only">Pipeline ETL: Open-Meteo → Supabase</h1>
       <Marca />
       <span aria-hidden className="hidden h-8 w-px bg-border sm:block" />
-      <RielPipeline etl={etl} activa={faseActiva} alAbrir={alAbrir} />
+      <div className="order-last basis-full sm:order-none sm:basis-auto sm:flex-1 sm:min-w-0">
+        <RielPipeline etl={etl} activa={faseActiva} alAbrir={alAbrir} />
+      </div>
       <TarjetaSupabase etl={etl} className="hidden shrink-0 md:flex" />
       <BotonTema />
       <Button

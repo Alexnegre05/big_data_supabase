@@ -155,7 +155,7 @@ export function MapaCiudades({ etl }: { etl: PipelineEtl }) {
   const vintage = filtro === "vintage"
 
   const [metrica, setMetrica] = React.useState<Metrica>("temperatura")
-  const [panelMetricaPlegado, setPanelMetricaPlegado] = React.useState(false)
+  const [panelMetricaPlegado, setPanelMetricaPlegado] = React.useState(true)
   const [estilo, setEstilo] = React.useState<Estilo>("datos")
   // El viento es decorativo: apagado por defecto y sin recordarse al recargar.
   const [verViento, setVerViento] = React.useState(false)
@@ -183,6 +183,7 @@ export function MapaCiudades({ etl }: { etl: PipelineEtl }) {
     let cancelado = false
     const marcadores: Marker[] = []
     let observador: ResizeObserver | undefined
+    let quitarTeclas: (() => void) | undefined
     void import("maplibre-gl").then(({ default: maplibre }) => {
       const lienzo = lienzoRef.current
       if (cancelado || !lienzo) return
@@ -205,7 +206,31 @@ export function MapaCiudades({ etl }: { etl: PipelineEtl }) {
         cooperativeGestures: true,
         locale: TEXTOS_MAPA,
       })
+      mapa.keyboard.disable()
       mapa.once("load", () => setEstadoMapa("listo"))
+      const alPulsarTecla = (evento: KeyboardEvent) => {
+        const destino = evento.target
+        if (
+          destino instanceof HTMLElement &&
+          (destino.closest(
+            'input, textarea, select, button, a, [contenteditable="true"], [role="button"], [role="textbox"]'
+          ) || (document.activeElement !== document.body && !lienzo.contains(destino)))
+        ) return
+        const tecla = evento.key.toLowerCase()
+        const paso = evento.shiftKey ? 160 : 80
+        const desplazamientos: Record<string, [number, number]> = {
+          arrowleft: [paso, 0], a: [paso, 0],
+          arrowright: [-paso, 0], d: [-paso, 0],
+          arrowup: [0, -paso], w: [0, -paso],
+          arrowdown: [0, paso], s: [0, paso],
+        }
+        const desplazamiento = desplazamientos[tecla]
+        if (!desplazamiento) return
+        evento.preventDefault()
+        mapa.panBy(desplazamiento, { duration: 180 })
+      }
+      window.addEventListener("keydown", alPulsarTecla)
+      quitarTeclas = () => window.removeEventListener("keydown", alPulsarTecla)
       // Los iconos dibujados del estilo vintage se pintan cuando el mapa los pide.
       mapa.on("styleimagemissing", (e) => {
         const icono = iconoVintage(e.id)
@@ -233,8 +258,27 @@ export function MapaCiudades({ etl }: { etl: PipelineEtl }) {
         )
         nuevos[c.nombre] = el
       }
-      // MapLibre solo escucha la ventana: el panel lateral cambia el ancho sin tocarla.
-      observador = new ResizeObserver(() => mapa.resize())
+      // Ajusta el zoom proporcionalmente al eje que más cambió de tamaño.
+      // Así aleja la vista al reducir el mapa y la recupera al ampliarlo.
+      let anchoAnterior = lienzo.clientWidth
+      let altoAnterior = lienzo.clientHeight
+      observador = new ResizeObserver(() => {
+        const ancho = lienzo.clientWidth
+        const alto = lienzo.clientHeight
+        mapa.resize()
+        if (anchoAnterior > 0 && altoAnterior > 0 && ancho > 0 && alto > 0) {
+          const ratioAncho = ancho / anchoAnterior
+          const ratioAlto = alto / altoAnterior
+          const ratio = Math.abs(Math.log(ratioAncho)) >= Math.abs(Math.log(ratioAlto))
+            ? ratioAncho
+            : ratioAlto
+          const cambioZoom = Math.log2(ratio)
+          if (Math.abs(cambioZoom) > 0.01)
+            mapa.zoomTo(mapa.getZoom() + cambioZoom, { duration: 120 })
+        }
+        anchoAnterior = ancho
+        altoAnterior = alto
+      })
       observador.observe(lienzo)
       mapaRef.current = mapa
       setElementos(nuevos)
@@ -242,6 +286,7 @@ export function MapaCiudades({ etl }: { etl: PipelineEtl }) {
     return () => {
       cancelado = true
       observador?.disconnect()
+      quitarTeclas?.()
       for (const m of marcadores) m.remove()
       mapaRef.current?.remove()
       mapaRef.current = null

@@ -42,7 +42,7 @@ export function AplicacionEtl() {
   // que el usuario ya haya elegido un ancho arrastrando el borde.
   const [ancho, setAncho] = React.useState<AnchoPanel>(null)
   // En escritorio el panel empieza abierto; en móvil se empieza por el mapa.
-  const [abierto, setAbierto] = React.useState(true)
+  const [abierto, setAbierto] = React.useState(false)
   const [abiertoMovil, setAbiertoMovil] = React.useState(false)
 
   const cambiarVista = (v: Vista) => {
