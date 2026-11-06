@@ -5,6 +5,7 @@ import {
   DatabaseIcon,
   HardDriveIcon,
   RefreshCwIcon,
+  Trash2Icon,
   XCircleIcon,
 } from "lucide-react"
 
@@ -67,6 +68,11 @@ export function PestanaSupabase({ etl }: { etl: PipelineEtl }) {
   } | null>(null)
   const [error, setError] = React.useState<string | null>(null)
   const [cargando, setCargando] = React.useState(false)
+  const [confirmarBorrado, setConfirmarBorrado] = React.useState(false)
+  const [fraseBorrado, setFraseBorrado] = React.useState("")
+  const [borrando, setBorrando] = React.useState(false)
+  const [errorBorrado, setErrorBorrado] = React.useState<string | null>(null)
+  const [mensajeBorrado, setMensajeBorrado] = React.useState<string | null>(null)
   const peticion = React.useRef(0)
 
   const leer = React.useCallback(async (p: ParametrosDatos) => {
@@ -85,6 +91,32 @@ export function PestanaSupabase({ etl }: { etl: PipelineEtl }) {
       if (id === peticion.current) setCargando(false)
     }
   }, [])
+
+  const borrarRegistros = async () => {
+    if (fraseBorrado !== "BORRAR TODOS LOS DATOS" || borrando) return
+    setBorrando(true)
+    setErrorBorrado(null)
+    setMensajeBorrado(null)
+    try {
+      const respuesta = await fetch("/api/mediciones", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ confirmacion: fraseBorrado }),
+      })
+      const datos = await respuesta.json()
+      if (!respuesta.ok) throw new Error(datos.error ?? "No se pudieron borrar los registros.")
+      setMensajeBorrado(`Se borraron ${formatoEntero(datos.eliminados)} registros de Supabase.`)
+      setConfirmarBorrado(false)
+      setFraseBorrado("")
+      setPagina(1)
+      await leer({ ...parametros, pagina: 1 })
+      await etl.refrescarEstadoSupabase()
+    } catch (e) {
+      setErrorBorrado(e instanceof Error ? e.message : "No se pudieron borrar los registros.")
+    } finally {
+      setBorrando(false)
+    }
+  }
 
   const parametros: ParametrosDatos = {
     ciudad: form.ciudad,
@@ -247,7 +279,58 @@ export function PestanaSupabase({ etl }: { etl: PipelineEtl }) {
               />
               Actualizar
             </Button>
+            <Button
+              variant="destructive"
+              onClick={() => {
+                setErrorBorrado(null)
+                setMensajeBorrado(null)
+                setConfirmarBorrado(true)
+              }}
+              disabled={borrando}
+            >
+              <Trash2Icon aria-hidden />
+              Borrar todos los registros
+            </Button>
           </div>
+
+          {confirmarBorrado && (
+            <Alert variant="destructive">
+              <Trash2Icon aria-hidden />
+              <AlertDescription className="flex flex-col gap-3">
+                <p>
+                  Esta acción borrará <strong>todos los registros actuales</strong> de la tabla de Supabase y no se puede deshacer.
+                  Escribe <strong>BORRAR TODOS LOS DATOS</strong> para confirmar.
+                </p>
+                <Input
+                  aria-label="Escribe BORRAR TODOS LOS DATOS para confirmar"
+                  value={fraseBorrado}
+                  onChange={(e) => setFraseBorrado(e.target.value)}
+                  autoComplete="off"
+                />
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    variant="destructive"
+                    disabled={borrando || fraseBorrado !== "BORRAR TODOS LOS DATOS"}
+                    onClick={() => void borrarRegistros()}
+                  >
+                    {borrando ? "Borrando…" : "Confirmar borrado total"}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    disabled={borrando}
+                    onClick={() => {
+                      setConfirmarBorrado(false)
+                      setFraseBorrado("")
+                    }}
+                  >
+                    Cancelar
+                  </Button>
+                </div>
+              </AlertDescription>
+            </Alert>
+          )}
+          {errorBorrado && <Alert variant="destructive"><XCircleIcon aria-hidden /><AlertDescription>{errorBorrado}</AlertDescription></Alert>}
+          {mensajeBorrado && <p role="status" className="text-sm text-muted-foreground">{mensajeBorrado}</p>}
 
           {error && (
             <Alert variant="destructive">
