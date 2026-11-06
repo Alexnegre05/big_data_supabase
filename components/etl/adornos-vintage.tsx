@@ -14,15 +14,17 @@ function diferencia(a: number, b: number) {
  * Rosa de los vientos que se comporta como una brújula: la carta apunta al
  * norte real (sigue el giro del mapa), tiembla al mover el ratón por el mapa y
  * da una vuelta al pasar por encima antes de asentarse con un muelle
- * amortiguado. Al pulsarla, el mapa vuelve a orientarse al norte.
+ * amortiguado. Al pulsarla, el mapa vuelve a su encuadre inicial y al norte.
  */
 export function RosaVientos({
   mapaRef,
   mapaListo,
+  alPulsar,
   className,
 }: {
   mapaRef: React.RefObject<MapaLibre | null>
   mapaListo: boolean
+  alPulsar?: () => void
   className?: string
 }) {
   const botonRef = React.useRef<HTMLButtonElement>(null)
@@ -107,9 +109,9 @@ export function RosaVientos({
     <button
       ref={botonRef}
       type="button"
-      aria-label="Orientar el mapa al norte"
-      title="Orientar el mapa al norte"
-      onClick={() => mapaRef.current?.easeTo({ bearing: 0, pitch: 0 })}
+      aria-label="Restablecer la vista inicial del mapa"
+      title="Volver a la vista inicial del mapa"
+      onClick={() => (alPulsar ? alPulsar() : mapaRef.current?.easeTo({ bearing: 0, pitch: 0 }))}
       className={cn(
         "rounded-full opacity-80 transition-[opacity,scale] duration-300 outline-none hover:scale-105 hover:opacity-100 focus-visible:ring-3 focus-visible:ring-ring/50",
         className

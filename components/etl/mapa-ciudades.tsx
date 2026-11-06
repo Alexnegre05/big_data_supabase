@@ -155,6 +155,7 @@ export function MapaCiudades({ etl }: { etl: PipelineEtl }) {
   const vintage = filtro === "vintage"
 
   const [metrica, setMetrica] = React.useState<Metrica>("temperatura")
+  const [panelMetricaPlegado, setPanelMetricaPlegado] = React.useState(false)
   const [estilo, setEstilo] = React.useState<Estilo>("datos")
   // El viento es decorativo: apagado por defecto y sin recordarse al recargar.
   const [verViento, setVerViento] = React.useState(false)
@@ -366,7 +367,11 @@ export function MapaCiudades({ etl }: { etl: PipelineEtl }) {
   const verTodas = () => {
     const mapa = mapaRef.current
     setActiva(null)
-    mapa?.fitBounds(LIMITES, ajuste(mapa.getContainer()))
+    mapa?.fitBounds(LIMITES, {
+      ...ajuste(mapa.getContainer()),
+      bearing: 0,
+      pitch: 0,
+    })
   }
   const alternarPantallaCompleta = () => {
     if (document.fullscreenElement) void document.exitFullscreen()
@@ -386,15 +391,14 @@ export function MapaCiudades({ etl }: { etl: PipelineEtl }) {
       </div>
 
       {vintage && (
-        <>
-          <MarcoVintage />
-          <RosaVientos
-            mapaRef={mapaRef}
-            mapaListo={elementos !== null}
-            className="absolute right-12 bottom-14 z-10 hidden size-28 @xl:block"
-          />
-        </>
+        <MarcoVintage />
       )}
+      <RosaVientos
+        mapaRef={mapaRef}
+        mapaListo={elementos !== null}
+        alPulsar={verTodas}
+        className="absolute right-12 bottom-14 z-10 hidden size-28 @xl:block"
+      />
 
       {estadoMapa !== "listo" && (
         <p className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center p-6 text-center text-sm text-muted-foreground">
@@ -425,7 +429,22 @@ export function MapaCiudades({ etl }: { etl: PipelineEtl }) {
       >
         {/* Las ciudades se eligen en el panel de Extracción (y en la ficha de cada marcador). */}
         <div className="flex flex-wrap items-start justify-end gap-3">
-          <div className={cn(FLOTANTE, "flex flex-col gap-3 p-3")}>
+          <div className={cn(FLOTANTE, "flex flex-col gap-3 p-3", panelMetricaPlegado && "p-2")}>
+            <div className="flex items-center justify-between gap-2">
+              {panelMetricaPlegado && <span className="px-1 text-xs font-medium">Métrica</span>}
+              <Button
+                variant="ghost"
+                size="icon-xs"
+                className={panelMetricaPlegado ? "" : "ml-auto"}
+                aria-label={panelMetricaPlegado ? "Restaurar panel de métrica" : "Minimizar panel de métrica"}
+                title={panelMetricaPlegado ? "Restaurar panel" : "Minimizar panel"}
+                aria-expanded={!panelMetricaPlegado}
+                onClick={() => setPanelMetricaPlegado((plegado) => !plegado)}
+              >
+                {panelMetricaPlegado ? <MaximizeIcon aria-hidden /> : <MinimizeIcon aria-hidden />}
+              </Button>
+            </div>
+            {!panelMetricaPlegado && <>
             <Segmentado
               etiqueta="Métrica"
               opciones={(Object.keys(METRICAS) as Metrica[]).map((m) => ({
@@ -558,6 +577,7 @@ export function MapaCiudades({ etl }: { etl: PipelineEtl }) {
                 )}
               </Button>
             </div>
+            </>}
           </div>
         </div>
       </div>
